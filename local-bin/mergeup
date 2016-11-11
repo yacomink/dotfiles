@@ -1,0 +1,26 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+use Getopt::Long;
+
+sub get_current_release {
+	my $release = `git branch -l | grep '*' | awk '{print \$2}'`;
+	chomp $release;
+	die "You do not currently appear to be in a release branch." unless $release =~ m/^(release)?([\d.]+a?)$/;
+	$release;
+}
+
+
+my ($feature,$bugfix) = ($ARGV[0],get_current_release);
+GetOptions(
+	'feature=s' => \$feature,
+	'bugfix=s' => \$bugfix
+);
+
+die "Must specify --feature and --bugfix" unless $feature && $bugfix;
+
+system "git checkout --track -b $feature origin/$feature";
+system "git rebase $bugfix";
+system "git checkout $bugfix";
+system "git merge --no-ff $feature"

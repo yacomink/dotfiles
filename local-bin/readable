@@ -1,0 +1,47 @@
+#!/usr/bin/env perl -w
+
+use POSIX qw(floor);
+
+my $time = $ARGV[0];
+
+unless ($time)
+{
+	print `date -u`;
+	print "Epoch: ".time()."\n";
+	print "Hour: ".floor(time() / 3600)."\n";
+	print "Day: ".floor(time() / (3600*24))."\n";
+	exit;
+}
+
+# mongo oid
+if ($time =~ m/[a-f0-9]{23}/)
+{
+	$time = get_time($time);
+}
+if ($time < 20000)
+{
+    $time *= 3600*24;
+}
+if ($time < 500000)
+{
+    $time *= 3600;
+}
+
+use DateTime;
+my $dt = DateTime->from_epoch( epoch => $time );
+
+print $dt->ymd('-')." ".$dt->hms(":")."\n"; 
+
+
+print "Epoch: ".$time."\n";
+print "Hour: ".floor($time / 3600)."\n";
+print "Day: ".floor($time / (3600*24))."\n";
+
+sub get_time {
+	my ($oid) = @_;
+	my $ts = 0;
+	for ( my $i = 0 ; $i < 4 ; $i++ ) {
+		$ts = ( $ts * 256 ) + hex( substr( $oid, $i * 2, 2 ) );
+	}
+	return $ts;
+}

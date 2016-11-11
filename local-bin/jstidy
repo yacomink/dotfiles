@@ -1,0 +1,33 @@
+#!/usr/bin/env perl
+
+my $diff = `git diff --name-only -z HEAD`;
+
+$zero  = chr(0);
+my @js_files = grep {
+	/.*\.js$/;
+} split /$zero/, $diff;
+
+# @js_files = (
+# 	'js_apps/src/apps/superposter/collections/formatted_fieldset.js',
+# 	'js_apps/src/apps/superposter/models/formatted_field.js',
+# 	'js_apps/src/apps/superposter/models/sub_buzz.js',
+# 	'js_apps/src/apps/superposter/views/content_order_picker.js',
+# 	'js_apps/src/apps/superposter/views/formatting_unit.js',
+# 	'js_apps/src/apps/superposter/views/longform_editor.js',
+# 	'js_apps/src/apps/superposter/views/longform_header.js',
+# 	'js_apps/src/apps/superposter/views/longform_insert_token.js',
+# );
+
+for (@js_files)
+{
+	`/usr/local/bin/js-beautify -f -j -k --brace-style=end-expand -o $_.tmp $_`;
+	if (-e "$_.tmp")
+	{
+		`mv $_.tmp $_`;
+	}
+	else
+	{
+		print "No $_.tmp present\n";
+		exit 1;
+	}
+}

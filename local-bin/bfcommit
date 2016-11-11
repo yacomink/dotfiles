@@ -1,0 +1,7 @@
+#!/bin/sh
+for LINE in `git status | sed -nE '/(\.pm|\.t|\.pl)$/p' | cut -d: -f2`; do
+        echo Running tidy on $LINE
+         perltidy -l=120 -ce -mbl=1 -nola -t -b $LINE ;
+done
+BRANCH=`git branch | sed -n '/*/p' | cut -d- -f2`
+git commit -a -m "$1 (issue #$BRANCH)"

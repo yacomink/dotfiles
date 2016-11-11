@@ -1,0 +1,196 @@
+#!/usr/bin/env perl
+use Term::Menus;
+
+my $thing = `git for-each-ref --sort=-committerdate --count=50 refs/heads --format='\%(refname)'`;
+
+my @branches = split("\n", $thing);
+my @display_branches = map {
+	chomp;
+	s/[* ]+(.*)/$1/;
+	s!refs/heads/!!;
+	$_;
+} @branches;
+
+
+my @other_options = (
+	"\e[0;34mCheckout remote branch\e[00m",
+	"\e[0;34mCheckout latest bugfix/release\e[00m",
+	"\e[0;34mDelete some branches\e[00m",
+	"\e[0;34mSearch all branches\e[00m",
+);
+
+
+my %Menu_1=(
+	  Display => 25,
+      Item_2 => {
+		 Text => "]Convey[",
+         Convey   => [@display_branches],
+      },
+      Item_1 => {
+		 Text => "]Convey[",
+         Convey   => [@other_options],
+      },
+
+      Select => 'One',
+      Banner => "Why are you here?"
+   );
+my @selections=&Menu(\%Menu_1);
+my $shipper = $selections[0];
+
+if ( grep { $_ eq $shipper } @branches )
+{
+	die if ($shipper =~ /quit/);
+	$shipper =~ s/[* ]+(.*)/$1/;
+	$shipper =~ s/\e\[(\d;)?\d\dm//g;
+
+	print `git checkout $shipper`;
+}
+elsif ( $shipper =~ m/.*Search.*/ )
+{
+    for my $b (@branches)
+    {
+        $b =~ s/[* ]+(.*)/$1/;
+    	$b =~ s/\e\[(\d;)?\d\dm//g;
+    	
+    	print `git checkout $b`;
+        print `ack 'zero_' ./`;
+    }
+    
+}
+elsif ( $shipper =~ m/.*remote.*/ )
+{
+	`git fetch`;
+	my $thing = `git for-each-ref --sort=-committerdate refs/remotes --format='\%(refname)'`;
+
+	my @branches = split("\n", $thing);
+	@branches = map {
+		chomp;
+		s/[* ]+(.*)/$1/;
+		s/refs\/remotes\/origin\///g;
+		$_;
+	} @branches;
+	
+	%Menu_1=(
+		  Display => 25,
+	      Item_1 => {
+			 Text => "]Convey[",
+	         Convey   => [@branches],
+	      },
+	      Select => 'One',
+	      Banner => "Which branch do you want?"
+	   );
+	@selections=&Menu(\%Menu_1);
+	my $shipper = $selections[0];
+	die if ($shipper =~ /quit/);
+
+	$shipper =~ s/[* ]+(.*)/$1/;
+	print `git checkout --track -b $shipper origin/$shipper`;
+}
+elsif ( $shipper =~ m/.*Delete.*/ )
+{
+
+	my $thing = `git branch -a`;
+
+	my @branches = split("\n", $thing);
+	@branches = map {
+		chomp;
+		s/[* ]+(.*)/$1/;
+		$_;
+	} @branches;
+	@branches = grep {
+		/([0-9]|release|bugfix)/
+		&& !/(remotes)/
+	} @branches;
+
+	%Menu_1=(
+		  Display => 25,
+	      Item_1 => {
+			 Text => "]Convey[",
+	         Convey   => [@branches],
+	      },
+	      Select => 'Many',
+	      Banner => "All starred branches will be deleted".(($ARGV[0] =~ m/origin-delete/)?" FROM THE ORIGIN TOO!!!!":"")
+	   );
+
+	for my $branch (&Menu(\%Menu_1))
+	{
+		die if ($branch =~ /quit/);
+
+		if ($branch =~ m!remotes/origin!)
+		{
+			$branch =~ s!remotes/origin!!;
+			print `git branch -Dr origin$branch`;
+
+			if ($ARGV[0] =~ m/origin-delete/)
+			{
+				print `git push origin :$branch`;
+			}
+		}
+		else
+		{
+			print `git branch -D $branch`
+		}
+		
+	}
+	
+}
+elsif ( $shipper =~ m/.*latest.*/ )
+{
+	`git fetch`;
+	my $thing = `git for-each-ref --sort=-committerdate refs/remotes/origin --format='\%(refname)' | fgrep '/release'`;
+	my @branches = split("\n", $thing);
+	@branches = map {
+		chomp;
+		s/[* ]+(.*)/$1/;
+		s/refs\/remotes\/origin\///g;
+		$_;
+	} @branches;
+
+	my $shipper = $branches[0];
+
+	`git checkout --track -b $shipper origin/$shipper`||`git checkout $shipper`;
+}
+
+sub versioncmp( $$ ) {
+	my @A = ( $_[0] =~ /([-.]|\d+|[^-.\d]+)/g );
+	my @B = ( $_[1] =~ /([-.]|\d+|[^-.\d]+)/g );	
+
+	my ( $A, $B );
+	while ( @A and @B ) {
+		$A = shift @A;
+		$B = shift @B;
+		if ( $A eq '-' and $B eq '-' ) {
+			next;
+		}
+		elsif ( $A eq '-' ) {
+			return -1;
+		}
+		elsif ( $B eq '-' ) {
+			return 1;
+		}
+		elsif ( $A eq '.' and $B eq '.' ) {
+			next;
+		}
+		elsif ( $A eq '.' ) {
+			return -1;
+		}
+		elsif ( $B eq '.' ) {
+			return 1;
+		}
+		elsif ( $A =~ /^\d+$/ and $B =~ /^\d+$/ ) {
+			if ( $A =~ /^0/ || $B =~ /^0/ ) {
+				return $A cmp $B if $A cmp $B;
+			}
+			else {
+				return $A <=> $B if $A <=> $B;
+			}
+		}
+		else {
+			$A = uc $A;
+			$B = uc $B;
+			return $A cmp $B if $A cmp $B;
+		}
+	}
+	@A <=> @B;
+}
+

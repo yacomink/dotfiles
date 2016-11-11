@@ -1,0 +1,102 @@
+#!/usr/bin/env perl
+
+use strict;
+
+use Term::Menus;
+use Getopt::Long;
+my $release = 0;
+GetOptions(
+	'release' => \$release
+);
+
+print "Update'ing";
+print `git pull -a`;
+
+my $thing = `git branch -a | grep 'remotes/origin/release'`;
+my @branches = split( "\n", $thing );
+@branches = sort { versioncmp( $b, $a ) } @branches;
+@branches = @branches[0..4];
+
+my $feature = `git branch -l | grep '*' | awk '{print \$2}'`;
+chomp $feature;
+
+my %Menu_1 = (
+	Display => 25,
+	Item_1  => {
+		Text   => "]Convey[",
+		Convey => [@branches],
+	},
+	Select => 'One',
+	Banner => "Rebase with $feature:"
+);
+my $treeish = &Menu( \%Menu_1 );
+exit if ( $treeish =~ /quit/ );
+
+my $shipper = $feature;
+if ($feature =~ m/.*-(rc|v)(\d)$/ && ($1 eq 'rc') || !$release )
+{
+	my $new = $2 + 1;
+	my $type = $1;
+	$shipper = $feature;
+	$shipper =~ s/-$type$2/-$type$new/;
+}
+else
+{
+	if ($feature =~ m/.*-(v)(\d)$/){
+		$shipper =~ s/(-v\d)//g;
+	}
+
+	$shipper .= '-rc1';
+}
+
+system( 'git rebase -i '.$treeish );
+
+print "Pushing $shipper\n";
+
+# system ("git checkout -b $shipper");
+# system ("git push origin $shipper");
+
+
+sub versioncmp( $$ ) {
+	my @A = ( $_[0] =~ /([-.]|\d+|[^-.\d]+)/g );
+	my @B = ( $_[1] =~ /([-.]|\d+|[^-.\d]+)/g );
+
+	my ( $A, $B );
+	while ( @A and @B ) {
+		$A = shift @A;
+		$B = shift @B;
+		if ( $A eq '-' and $B eq '-' ) {
+			next;
+		}
+		elsif ( $A eq '-' ) {
+			return -1;
+		}
+		elsif ( $B eq '-' ) {
+			return 1;
+		}
+		elsif ( $A eq '.' and $B eq '.' ) {
+			next;
+		}
+		elsif ( $A eq '.' ) {
+			return -1;
+		}
+		elsif ( $B eq '.' ) {
+			return 1;
+		}
+		elsif ( $A =~ /^\d+$/ and $B =~ /^\d+$/ ) {
+			if ( $A =~ /^0/ || $B =~ /^0/ ) {
+				return $A cmp $B if $A cmp $B;
+			}
+			else {
+				return $A <=> $B if $A <=> $B;
+			}
+		}
+		else {
+			$A = uc $A;
+			$B = uc $B;
+			return $A cmp $B if $A cmp $B;
+		}
+	}
+	@A <=> @B;
+}
+

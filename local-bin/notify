@@ -1,0 +1,3 @@
+#!/bin/sh
+automator -D title="$1" -D subtitle="$2" -D message="$3" ~/Library/Workflows/"Display Notification.workflow" > /dev/null 2>&1
+

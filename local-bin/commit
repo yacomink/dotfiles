@@ -1,0 +1,15 @@
+#!/usr/bin/env perl -w 
+my $branch = $ARGV[1]||`git branch | sed -n '/*/p'`;
+chomp $branch;
+
+my $message = $ARGV[0];
+
+if ( $branch =~ /\*\s+([A-Z]+-\d+)/ ) {
+	$message = "$1: " . $message;
+}
+else
+{
+	die "Not on a numbered branch.";
+}
+
+system ("git", "commit", "-am", $message);
