@@ -1,0 +1,6 @@
+#!/usr/bin/perl
+
+my $path = `readlink -f $ARGV[0]`;
+$path =~ s!/home/ayacomink/development/!/Users/ayacomink/workspace/Etsy/!;
+print "PARENT-SUBL $path";
+
